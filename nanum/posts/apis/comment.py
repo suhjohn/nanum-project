@@ -43,11 +43,6 @@ class CommentListCreateView(generics.ListCreateAPIView):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    def post(self, request, *args, **kwargs):
-        if not request.data:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        return self.create(request, *args, **kwargs)
-
     def create(self, request, *args, **kwargs):
         """
         CreateModelMixin의 create 함수 override
