@@ -1,8 +1,10 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Sum
 from django.utils import timezone
 
 from utils import rescale
+from ..utils import fields
 from ..utils import (
     user_img_path,
     user_thumb_img_25_path,
@@ -12,8 +14,8 @@ from ..utils import (
 
 __all__ = (
     'Profile',
-    'EducationCredentials',
-    'EmploymentCredentials',
+    'EmploymentCredential',
+    'EducationCredential',
 )
 
 User = settings.AUTH_USER_MODEL
@@ -25,9 +27,9 @@ DOCTORATE = 'PHD'
 
 DEGREES = (
     (HIGHSCHOOL, '고등학교'),
-    (BACHELOR, '대학교'),
-    (MASTERS, '석사과정'),
-    (DOCTORATE, '박사과정')
+    (BACHELOR, '학사'),
+    (MASTERS, '석사'),
+    (DOCTORATE, '박사')
 )
 
 # 1900 ~ 현재 연도
@@ -59,9 +61,12 @@ class Profile(models.Model):
     user = models.OneToOneField(User, primary_key=True, on_delete=models.CASCADE)
     image = models.ImageField(upload_to=user_img_path, blank=True, null=True)
     # A * A 픽셀별 썸네일 이미지
-    thumbnail_image_200 = models.ImageField(upload_to=user_thumb_img_200_path, blank=True, null=True)
-    thumbnail_image_50 = models.ImageField(upload_to=user_thumb_img_50_path, blank=True, null=True)
-    thumbnail_image_25 = models.ImageField(upload_to=user_thumb_img_25_path, blank=True, null=True)
+    thumbnail_image_200 = fields.DefaultStaticImageField(upload_to=user_thumb_img_200_path, blank=True, null=True,
+                                                         default_image_path='default_profile_image/thumbnail_image_200.png')
+    thumbnail_image_50 = fields.DefaultStaticImageField(upload_to=user_thumb_img_50_path, blank=True, null=True,
+                                                        default_image_path='default_profile_image/thumbnail_image_50.png')
+    thumbnail_image_25 = fields.DefaultStaticImageField(upload_to=user_thumb_img_25_path, blank=True, null=True,
+                                                        default_image_path='default_profile_image/thumbnail_image_25.png')
 
     # 여러 credential 중에서 다른 유저들에게 메인으로 표시될 필드
     main_credential = models.CharField(max_length=100, blank=True)
@@ -73,6 +78,14 @@ class Profile(models.Model):
     # relation 에서 가져온 정보 - 누적되는 팔로워/팔로잉 수
     follower_count = models.IntegerField(default=0)
     following_count = models.IntegerField(default=0)
+
+    @property
+    def answer_count(self):
+        return self.user.answer_set.count()
+
+    @property
+    def upvote_count(self):
+        return self.user.answer_set.aggregate(Sum('upvote_count'))['upvote_count__sum']
 
     def __str__(self):
         return f'Profile of {self.user}'
@@ -97,11 +110,24 @@ class Profile(models.Model):
         super().save(*args, **kwargs)
 
 
-class EducationCredentials(models.Model):
+class EmploymentCredential(models.Model):
+    """
+    유저 프로필에 들어가는 이력
+    """
+    profile = models.ForeignKey('Profile', on_delete=models.CASCADE, related_name="employment_credentials")
+    company = models.ForeignKey('topics.Topic', on_delete=models.SET_NULL, blank=True, null=True,
+                                related_name="company_credentials")
+    position = models.CharField(max_length=50, blank=True)
+    start_year = models.IntegerField(choices=YEAR_CHOICES, blank=True, null=True)
+    end_year = models.IntegerField(choices=YEAR_CHOICES, blank=True, null=True)
+    working_status = models.BooleanField(default=False)
+
+
+class EducationCredential(models.Model):
     """
     유저 프로필에 들어가는 학력
     """
-    user = models.ForeignKey('Profile', on_delete=models.CASCADE, related_name="education_credentials")
+    profile = models.ForeignKey('Profile', on_delete=models.CASCADE, related_name="education_credentials")
     school = models.ForeignKey('topics.Topic', on_delete=models.SET_NULL, blank=True, null=True,
                                related_name="school_credentials")
     # 전공
@@ -110,17 +136,3 @@ class EducationCredentials(models.Model):
     # 학위
     degree_type = models.CharField(choices=DEGREES, max_length=3, blank=True)
     graduation_year = models.IntegerField(choices=YEAR_CHOICES, blank=True, null=True)
-
-
-class EmploymentCredentials(models.Model):
-    """
-    유저 프로필에 들어가는 이력
-    """
-    user = models.ForeignKey('Profile', on_delete=models.CASCADE, related_name="employment_credentials")
-    position = models.CharField(max_length=50, blank=True)
-    company = models.ForeignKey('topics.Topic', on_delete=models.SET_NULL, blank=True, null=True,
-                                related_name="company_credentials")
-
-    start_year = models.IntegerField(choices=YEAR_CHOICES, blank=True, null=True)
-    end_year = models.IntegerField(choices=YEAR_CHOICES, blank=True, null=True)
-    working_status = models.BooleanField(default=False)

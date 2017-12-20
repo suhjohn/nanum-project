@@ -1,6 +1,8 @@
 from django.conf.urls import url
 
-from users.apis import ProfileRetrieveUpdateView
+from users.apis import ProfileRetrieveUpdateView, EmploymentCredentialListCreateView, EmploymentCredentialDetailView, \
+    ProfileStatsRetrieveView, EducationCredentialListCreateView, EducationCredentialDetailView, \
+    PasswordResetSendMailView, PasswordResetConfirmView, PasswordResetView
 from users.apis.relation.follow import UserFollowRelationCreateView, UserFollowRelationDetailView, \
     QuestionFollowRelationCreateView, QuestionFollowRelationDetailView, UserFollowerListView, UserFollowingListView, \
     FollowingInterestListView, FollowingExpertiseListView
@@ -14,9 +16,14 @@ urlpatterns = [
 
     # /user/signup/
     url(r'^signup/$', SignupView.as_view(), name='signup'),
-    # /user/signup/verify-email/
-    # url(r'^signup/verify-email/$', VerfiyEmailView.as_view(), name='verify_email'),
     url(r'^login/$', LoginView.as_view(), name='login'),
+
+    # /user/password-reset/send-mail/
+    url(r'^password-reset/send-mail/$', PasswordResetSendMailView.as_view(), name='password-reset-send-mail'),
+    # /user/password-reset/confirm/
+    url(r'^password-reset/confirm/$', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
+    # /user/password-reset/
+    url(r'^password-reset/$', PasswordResetView.as_view(), name='password-reset'),
 
     # SOCIAL_AUTH
 
@@ -81,13 +88,39 @@ urlpatterns = [
     # /user/answer-downvote-relation/
     url(r'^answer-downvote-relation/$', AnswerDownVoteRelationCreateView.as_view(),
         name='answer-downvote-relation'),
+    # /user/
 
     # 3. BOOKMARK
 
     # Profile
-    # 1. Profile Retrieve / Update
-    # /user/1/profile/
-    url(r'^(?P<pk>\d+)/profile/$', ProfileRetrieveUpdateView.as_view(),
-        name='profile-detail'),
+    # 1. Profile Main Detail Retrieve/Update
+    # /user/1/profile/main-profile/
+    url(r'^(?P<pk>\d+)/profile/main-detail/$', ProfileRetrieveUpdateView.as_view(),
+        name='profile-main-detail'),
+
+    # 2 Profile Stats
+    # /user/1/profile/stats/
+    url(r'^(?P<pk>\d+)/profile/stats/$', ProfileStatsRetrieveView.as_view(),
+        name='profile-stats'),
+
+    # 3. Profile Employment Credential List/Create
+    # /user/1/profile/empl-credentials/
+    url(r'^(?P<pk>\d+)/profile/empl-credentials/$', EmploymentCredentialListCreateView.as_view(),
+        name='profile-empl-credential-list'),
+
+    # 4. Profile Employment Credential Retrieve, Update, Delete
+    # /user/1/profile/empl-credentials/1/
+    url(r'^(?P<pk>\d+)/profile/empl-credentials/(?P<credential_pk>\d+)/$', EmploymentCredentialDetailView.as_view(),
+        name='profile-empl-credential-detail'),
+
+    # 5. Profile Education Credential List/Create
+    # /user/1/profile/edu-credentials/
+    url(r'^(?P<pk>\d+)/profile/edu-credentials/$', EducationCredentialListCreateView.as_view(),
+        name='profile-edu-credential-list'),
+
+    # 6. Profile Education Credential Retrieve, Update, Delete
+    # /user/1/profile/edu-credentials/1/
+    url(r'^(?P<pk>\d+)/profile/edu-credentials/(?P<credential_pk>\d+)/$', EducationCredentialDetailView.as_view(),
+        name='profile-edu-credential-detail'),
 
 ]

@@ -1,2 +1,2 @@
-from .test_answers import *
-from .test_question import *
+from .question import *
+from .answer import *

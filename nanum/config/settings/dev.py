@@ -4,7 +4,8 @@ config_secret = json.loads(open(CONFIG_SECRET_DEV_FILE).read())
 
 # Installed Apps
 INSTALLED_APPS += [
-    'storages'
+    'storages',
+    'corsheaders',
 ]
 
 # Secret Files / AWS
@@ -30,4 +31,13 @@ ALLOWED_HOSTS = [
     'localhost',
     '.elasticbeanstalk.com',
     '.siwon.me',
+    '172.31.16.135',
 ]
+
+# CORS
+CORS_ORIGIN_ALLOW_ALL = False
+
+CORS_ORIGIN_WHITELIST = (
+    'localhost:4200',
+    'esdyee.github.io',
+)

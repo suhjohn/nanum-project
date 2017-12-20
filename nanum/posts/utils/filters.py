@@ -1,6 +1,7 @@
 import django_filters
 from django_filters import rest_framework as filters, OrderingFilter
 from django_filters.fields import Lookup
+from rest_framework.exceptions import ParseError
 
 from ..models import Answer, Question, Comment
 
@@ -32,13 +33,21 @@ class ListFilter(django_filters.Filter):
         return super().filter(qs, Lookup(multiple_vals, 'in'))
 
 
+class IntegerListFilter(ListFilter):
+    def customize(self, value):
+        try:
+            return int(value)
+        except:
+            raise ParseError({"error": "이 query_parameter에 해당하지 않는 type의 value입니다"})
+
+
 class AnswerFilter(filters.FilterSet):
     """
     답변 query_params를 통한 각종 필드 filter를 만들어주는 class
     """
-    user = ListFilter(name='user', )
-    topic = ListFilter(name='question__topics')
-    bookmarked_by = ListFilter(name='answerbookmarkrelation__user', )
+    user = IntegerListFilter(name='user', )
+    topic = IntegerListFilter(name='question__topics')
+    bookmarked_by = IntegerListFilter(name='answerbookmarkrelation__user', )
     ordering = OrderingFilter(
         fields=(
             ('modified_at', 'modified_at'),
@@ -51,7 +60,7 @@ class AnswerFilter(filters.FilterSet):
         fields = ['user', 'topic', 'bookmarked_by', ]
 
 
-class CommentFilter(AnswerFilter):
+class CommentFilter(filters.FilterSet):
     ordering = OrderingFilter(
         fields=(
             ('modified_at', 'modified_at'),
@@ -62,6 +71,15 @@ class CommentFilter(AnswerFilter):
     class Meta:
         model = Comment
         fields = []
+
+
+class CommentListFilter(CommentFilter):
+    question = ListFilter(name='comment_post_intermediate__question')
+    answer = ListFilter(name='comment_post_intermediate__answer')
+
+    class Meta:
+        model = Comment
+        fields = ['question', 'answer']
 
 
 # QuestionListFilter
@@ -79,6 +97,8 @@ class QuestionFilter(django_filters.FilterSet):
     followed_by = QuestionListFilter(name='followers', )
     # 해당 유저가 북마크하는 질문
     bookmarked_by = QuestionListFilter(name='who_bookmarked', )
+    # 해당 topic을 포함하는 질문
+    topic = QuestionListFilter(name='topics', )
     ordering = OrderingFilter(
         fields=(
             ('modified_at', 'modified_at'),
@@ -88,4 +108,4 @@ class QuestionFilter(django_filters.FilterSet):
 
     class Meta:
         model = Question
-        fields = ['user', 'answered_by', 'bookmarked_by', 'followed_by', 'follow_count']
+        fields = ['user', 'answered_by', 'bookmarked_by', 'followed_by', 'topic']

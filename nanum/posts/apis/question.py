@@ -1,41 +1,38 @@
 from django.contrib.auth import get_user_model
 from django_filters import rest_framework as filters
-
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 
 from posts.models import Question
 from posts.utils.filters import QuestionFilter
-from ..serializers.question import QuestionSerializer
+from posts.utils.pagination import CustomPagination
+from ..serializers.question import QuestionGetSerializer, QuestionPostSerializer, QuestionUpdateDestroySerializer, \
+    QuestionFilterGetSerializer
 
 __all__ = (
     'QuestionListCreateView',
     'QuestionMainFeedListView',
+    'QuestionRetrieveUpdateDestroyView',
+    'QuestionFilterListView',
 )
 
 User = get_user_model()
 
 
-#############################################################
-# 1. 내 질문을 제외한 전문분야, 관심분야 질문 리스트(main-feed) [X]
-# 2. 북마크한 질문 리스트, 최신 질문 리스트 [X]
-# 4. 나에게 요청된 질문 리스트 []
-# 5. 답변 중인 질문 리스트 []
-#############################################################
-
+# 해당 유저의 모든 질문, 해당 유저가 답변한 질문, 해당 유저가 팔로우하는 질문, 해당 유저가 북마크하는 질문
 class QuestionListCreateView(generics.ListCreateAPIView):
     queryset = Question.objects.all()
-    serializer_class = QuestionSerializer
     permission_classes = (
-        permissions.IsAuthenticated,
+        permissions.IsAuthenticatedOrReadOnly,
     )
     filter_backends = (filters.DjangoFilterBackend,)
     filter_class = QuestionFilter
+    pagination_class = CustomPagination
 
     def filter_queryset(self, queryset):
         query_params = self.request.query_params.keys()
         value = self.request.query_params.values()
-        filter_fields = self.filter_class.get_fields().keys() | {'ordering'}
+        filter_fields = self.filter_class.get_fields().keys() | {'ordering', 'page'}
         error = None
 
         if "" in list(value):
@@ -50,6 +47,16 @@ class QuestionListCreateView(generics.ListCreateAPIView):
                 queryset = backend().filter_queryset(self.request, queryset, self)
 
         return error, queryset
+
+    # POST
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return QuestionGetSerializer
+        else:
+            return QuestionPostSerializer
 
     def list(self, request, *args, **kwargs):
         """
@@ -71,13 +78,14 @@ class QuestionListCreateView(generics.ListCreateAPIView):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
 
+# 해당 유저가 전문분야 설정에서 선택한 토픽들
+class QuestionFilterListView(generics.ListAPIView):
+    """
+    queryset을 해당 유저가 전문분야 설정에서 선택한 토픽들을 리턴하는 queryset으로 재정의합니다.
+    """
 
-# 내 질문을 제외한 전문분야, 관심분야 질문 리스트(main-feed)
-class QuestionMainFeedListView(generics.ListAPIView):
-    serializer_class = QuestionSerializer
+    serializer_class = QuestionFilterGetSerializer
     permission_classes = (
         permissions.IsAuthenticatedOrReadOnly,
     )
@@ -85,32 +93,58 @@ class QuestionMainFeedListView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
 
-        exclude_user = Question.objects.exclude(user=self.request.user)
-        query_set = Question.objects.none()
+        queryset = Question.objects.exclude(user=user)
 
         # 사용자가 선택한 전문분야 토픽
-        topic_expertise = user.topic_expertise.value_lists(flat=True)
-        topic_interests = user.topic_interests.value_lists(flat=True)
+        topic_expertise = user.topic_expertise.values_list('id', flat=True)
+        topics_queryset = queryset & Question.objects.filter(topics__in=topic_expertise)
+        # queryset = Question.objects.filter(topics__in=expertise_topics)
+        # queryset = Topic.objects.filter(pk__in=expertise_topics)
+        return topics_queryset
 
-        topics = topic_expertise.extend(topic_interests)
 
-        # Get Follower's Answers
-        following_users = user.following.values_list(flat=True)
+# 내 질문을 제외한 전문분야, 관심분야 질문 리스트(main-feed)
+class QuestionMainFeedListView(generics.ListAPIView):
+    """
+    queryset을 내 질문을 제외한 전문분야, 관심분야 질문 리스트를 리턴하는 queryset으로 재정의합니다.
+    """
+    serializer_class = QuestionGetSerializer
+    permission_classes = (
+        permissions.IsAuthenticatedOrReadOnly,
+    )
 
-        # Filter Answer, order by the most recently modified post
-        queryset = Question.objects.filter(topic__in=topics) \
-            .filter(user__in=following_users) \
-            .order_by('modified_at')
+    def get_queryset(self):
+        user = self.request.user
 
-        if not queryset:
-            queryset = Question.objects.all()
+        queryset = Question.objects.exclude(user=user)
 
+        # 사용자가 선택한 전문분야, 관심분야 토픽
+        topic_expertise = user.topic_expertise.values_list('id', flat=True)
+        topic_interests = user.topic_interests.values_list('id', flat=True)
+        # combine
+        topics = topic_expertise | topic_interests
+        # 사용자가 팔로우한 유저
+        following_users = user.following.values_list('id', flat=True)
+
+        topics_queryset = queryset & Question.objects.filter(topics__in=topics)
+        following_users_queryset = queryset & Question.objects.filter(user__in=following_users)
+        # queryset
+        # queryset = (topics_queryset | following_users_queryset).distinct()
+        queryset = (topics_queryset | following_users_queryset).order_by('-modified_at').distinct()
         return queryset
 
 
 class QuestionRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    질문에 대한 pk값으로 Question 객체 하나를 가져오거나 업데이트하거나 삭제하는 기능을 합니다.
+    업데이트는 전체 input값을 모두 업데이트하는 PUT과 부분만 업데이트하는 PATCH를 지원합니다.
+    """
     queryset = Question.objects.all()
-    serializer_class = QuestionSerializer
     permission_classes = (
         permissions.IsAuthenticatedOrReadOnly,
     )
+
+    def get_serializer_class(self, *args, **kwargs):
+        if self.request.method == 'PUT' or self.request.method == 'PATCH':
+            return QuestionUpdateDestroySerializer
+        return QuestionGetSerializer
