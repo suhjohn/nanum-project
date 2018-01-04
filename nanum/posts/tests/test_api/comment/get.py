@@ -46,13 +46,17 @@ class CommentGetTest(CustomBaseTest):
 
     def test_comment_retrieve_when_not_authenticated(self):
         """
-        유저가 로그인 되지 않았을 시 400이 오는 지 확인
+        유저가 로그인 되지 않았을 시 400이 오는지 확인
         :return:
         """
         response = self.client.get(self.URL_API_COMMENT_DETAIL.format(pk=1))
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_comment_retrieve_with_wrong_query_param(self):
+        """
+        잘못된 query parameter에 대해 400이 오는지 확인
+        :return:
+        """
         user = User.objects.first()
         self.client.force_authenticate(user=user)
         response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=1)}?not_possible=1')
@@ -115,3 +119,4 @@ class CommentGetTest(CustomBaseTest):
         response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=1)}?immediate_children=True')
         self.assertEqual(response.data["immediate_children_count"], 10)
         self.assertEqual("immediate_children" in response.data, True)
+
