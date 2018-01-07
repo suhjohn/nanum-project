@@ -34,6 +34,10 @@ class CommentGetTest(CustomBaseTest):
             for i in range(5):
                 c = cls.create_comment(user=user, question=question, parent=comment)
 
+    @property
+    def first_comment(self):
+        return Comment.objects.first().pk
+
     def test_comment_retrieve(self):
         """
         유저가 로그인 되어 있을 시 200이 오는지 확인
@@ -41,7 +45,7 @@ class CommentGetTest(CustomBaseTest):
         """
         user = User.objects.first()
         self.client.force_authenticate(user=user)
-        response = self.client.get(self.URL_API_COMMENT_DETAIL.format(pk=1))
+        response = self.client.get(self.URL_API_COMMENT_DETAIL.format(pk=self.first_comment))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_comment_retrieve_when_not_authenticated(self):
@@ -49,7 +53,7 @@ class CommentGetTest(CustomBaseTest):
         유저가 로그인 되지 않았을 시 400이 오는지 확인
         :return:
         """
-        response = self.client.get(self.URL_API_COMMENT_DETAIL.format(pk=1))
+        response = self.client.get(self.URL_API_COMMENT_DETAIL.format(pk=self.first_comment))
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_comment_retrieve_with_wrong_query_param(self):
@@ -59,7 +63,7 @@ class CommentGetTest(CustomBaseTest):
         """
         user = User.objects.first()
         self.client.force_authenticate(user=user)
-        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=1)}?not_possible=1')
+        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=self.first_comment)}?not_possible=1')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_comment_retrieve_without_query_param_value(self):
@@ -69,7 +73,7 @@ class CommentGetTest(CustomBaseTest):
         """
         user = User.objects.first()
         self.client.force_authenticate(user=user)
-        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=1)}?all_children=')
+        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=self.first_comment)}?all_children=')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_comment_retrieve_with_query_params_not_matching_type(self):
@@ -79,7 +83,7 @@ class CommentGetTest(CustomBaseTest):
         """
         user = User.objects.first()
         self.client.force_authenticate(user=user)
-        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=1)}?topic=a')
+        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=self.first_comment)}?topic=a')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_comment_retrieve_single_query_paramter(self):
@@ -93,7 +97,7 @@ class CommentGetTest(CustomBaseTest):
         self.client.force_authenticate(user=user)
         query_paramters = ['all_children', 'immediate_children']
         for query in query_paramters:
-            response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=1)}?{query}=True')
+            response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=self.first_comment)}?{query}=True')
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_comment_retrieve_pagination_for_all_children(self):
@@ -104,7 +108,7 @@ class CommentGetTest(CustomBaseTest):
         """
         user = User.objects.first()
         self.client.force_authenticate(user=user)
-        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=1)}?all_children=True')
+        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=self.first_comment)}?all_children=True')
         self.assertEqual(response.data["all_children_count"], 60)
         self.assertEqual("all_children" in response.data, True)
 
@@ -116,7 +120,7 @@ class CommentGetTest(CustomBaseTest):
         """
         user = User.objects.first()
         self.client.force_authenticate(user=user)
-        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=1)}?immediate_children=True')
+        response = self.client.get(f'{self.URL_API_COMMENT_DETAIL.format(pk=self.first_comment)}?immediate_children=True')
         self.assertEqual(response.data["immediate_children_count"], 10)
         self.assertEqual("immediate_children" in response.data, True)
 
